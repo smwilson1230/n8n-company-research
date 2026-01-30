@@ -65,18 +65,14 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://nubela.co/proxycurl/api/linkedin/company/resolve",
+        "url": "https://api.apollo.io/api/v1/organizations/enrich",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             {
-              "name": "company_name",
-              "value": "={{ $json['Company Name'] }}"
-            },
-            {
-              "name": "company_domain",
+              "name": "domain",
               "value": "={{ $json['Website'] }}"
             }
           ]
@@ -85,15 +81,15 @@
           "timeout": 30000
         }
       },
-      "id": "proxycurl-resolve",
-      "name": "Proxycurl Resolve Company",
+      "id": "apollo-resolve",
+      "name": "Apollo Resolve Company",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [900, 480],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "proxycurl-api",
-          "name": "Proxycurl API Key"
+          "id": "apollo-api",
+          "name": "Apollo API Key"
         }
       },
       "onError": "continueRegularOutput",
@@ -112,24 +108,92 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://nubela.co/proxycurl/api/linkedin/company/employees/",
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/mixed_people/api_search",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             {
-              "name": "linkedin_company_profile_url",
-              "value": "={{ $('Proxycurl Resolve Company').item.json.url || $('Loop Over Companies').item.json['LinkedIn URL'] }}"
+              "name": "q_organization_domains",
+              "value": "={{ $json['Website'] || $('Apollo Resolve Company').item.json.primary_domain || '' }}"
             },
             {
-              "name": "keyword_regex",
-              "value": "CIO|CTO|CISO|CDO|Chief Information Officer|Chief Technology Officer|Chief Information Security Officer|Chief Digital Officer|VP of IT|VP Engineering|VP Infrastructure|VP Security|VP Technology|VP Information Systems|Director of IT|Director of Engineering|Director of Infrastructure|Director of Security|Director of Technology"
+              "name": "person_titles[]",
+              "value": "CIO"
             },
             {
-              "name": "enrich_profiles",
-              "value": "enrich"
+              "name": "person_titles[]",
+              "value": "CTO"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "CISO"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "CDO"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Chief Information Officer"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Chief Technology Officer"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Chief Information Security Officer"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Chief Digital Officer"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP of IT"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP Engineering"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP Infrastructure"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP Security"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP Technology"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of IT"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of Engineering"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of Infrastructure"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of Security"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of Technology"
+            },
+            {
+              "name": "per_page",
+              "value": "25"
             }
           ]
         },
@@ -137,15 +201,15 @@
           "timeout": 60000
         }
       },
-      "id": "proxycurl-employees",
-      "name": "Proxycurl Search IT Leaders",
+      "id": "apollo-employees",
+      "name": "Apollo Search IT Leaders",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1340, 480],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "proxycurl-api",
-          "name": "Proxycurl API Key"
+          "id": "apollo-api",
+          "name": "Apollo API Key"
         }
       },
       "onError": "continueRegularOutput",
@@ -297,7 +361,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"system\": \"You are an expert business researcher producing weekly incremental updates on IT leadership changes and corporate technology strategy. You compare new data against existing records to identify what is NEW and what has CHANGED.\\n\\nAlways output valid JSON matching this schema:\\n{\\n  \\\"company\\\": string,\\n  \\\"week_of\\\": string,\\n  \\\"new_leaders\\\": [{ \\\"name\\\": string, \\\"title\\\": string, \\\"linkedin_url\\\": string, \\\"background\\\": string, \\\"talking_points\\\": [string] }],\\n  \\\"changed_leaders\\\": [{ \\\"name\\\": string, \\\"previous_title\\\": string, \\\"new_title\\\": string, \\\"change_summary\\\": string }],\\n  \\\"departed_leaders\\\": [{ \\\"name\\\": string, \\\"previous_title\\\": string }],\\n  \\\"new_filings\\\": [{ \\\"form\\\": string, \\\"date\\\": string, \\\"key_findings\\\": string }],\\n  \\\"new_initiatives\\\": [{ \\\"initiative\\\": string, \\\"description\\\": string }],\\n  \\\"updated_themes\\\": [{ \\\"theme\\\": string, \\\"update\\\": string }],\\n  \\\"executive_summary\\\": string\\n}\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate a weekly delta report for the following company:\\n\\nCompany: {{ $('Loop Over Companies').item.json['Company Name'] }}\\nWeek of: {{ new Date().toISOString().split('T')[0] }}\\n\\n--- CURRENT IT LEADERS FROM LINKEDIN (fresh Proxycurl data) ---\\n{{ JSON.stringify($('Proxycurl Search IT Leaders').item.json.employees || $('Proxycurl Search IT Leaders').item.json || [], null, 2) }}\\n\\n--- PREVIOUSLY KNOWN LEADERS (from our database) ---\\n{{ JSON.stringify($('Read Existing Leaders').item.json || [], null, 2) }}\\n\\n--- NEW SEC FILINGS SINCE LAST CHECK ---\\n{{ JSON.stringify($('Parse New Filings').item.json.newFilings || [], null, 2) }}\\n\\n--- INSTRUCTIONS ---\\n1. Compare the current LinkedIn leaders against previously known leaders. Identify:\\n   - NEW leaders (in current data but not in previous)\\n   - CHANGED leaders (same person but different title)\\n   - DEPARTED leaders (in previous data but not in current)\\n2. For new leaders, provide background and 3-5 talking points.\\n3. Summarize any new SEC filings and key technology-related findings.\\n4. Identify any new strategic initiatives or updated technology themes.\\n5. Write a brief executive summary (2-3 sentences) of what changed this week.\\n\\nIf nothing meaningful changed, still produce valid JSON with empty arrays and a summary noting no significant changes.\\n\\nOutput ONLY valid JSON matching the required schema.\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"system\": \"You are an expert business researcher producing weekly incremental updates on IT leadership changes and corporate technology strategy. You compare new data against existing records to identify what is NEW and what has CHANGED.\\n\\nAlways output valid JSON matching this schema:\\n{\\n  \\\"company\\\": string,\\n  \\\"week_of\\\": string,\\n  \\\"new_leaders\\\": [{ \\\"name\\\": string, \\\"title\\\": string, \\\"linkedin_url\\\": string, \\\"background\\\": string, \\\"talking_points\\\": [string] }],\\n  \\\"changed_leaders\\\": [{ \\\"name\\\": string, \\\"previous_title\\\": string, \\\"new_title\\\": string, \\\"change_summary\\\": string }],\\n  \\\"departed_leaders\\\": [{ \\\"name\\\": string, \\\"previous_title\\\": string }],\\n  \\\"new_filings\\\": [{ \\\"form\\\": string, \\\"date\\\": string, \\\"key_findings\\\": string }],\\n  \\\"new_initiatives\\\": [{ \\\"initiative\\\": string, \\\"description\\\": string }],\\n  \\\"updated_themes\\\": [{ \\\"theme\\\": string, \\\"update\\\": string }],\\n  \\\"executive_summary\\\": string\\n}\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate a weekly delta report for the following company:\\n\\nCompany: {{ $('Loop Over Companies').item.json['Company Name'] }}\\nWeek of: {{ new Date().toISOString().split('T')[0] }}\\n\\n--- CURRENT IT LEADERS FROM LINKEDIN (via Apollo) ---\\n{{ JSON.stringify($('Apollo Search IT Leaders').item.json.people || $('Apollo Search IT Leaders').item.json || [], null, 2) }}\\n\\n--- PREVIOUSLY KNOWN LEADERS (from our database) ---\\n{{ JSON.stringify($('Read Existing Leaders').item.json || [], null, 2) }}\\n\\n--- NEW SEC FILINGS SINCE LAST CHECK ---\\n{{ JSON.stringify($('Parse New Filings').item.json.newFilings || [], null, 2) }}\\n\\n--- INSTRUCTIONS ---\\n1. Compare the current LinkedIn leaders against previously known leaders. Identify:\\n   - NEW leaders (in current data but not in previous)\\n   - CHANGED leaders (same person but different title)\\n   - DEPARTED leaders (in previous data but not in current)\\n2. For new leaders, provide background and 3-5 talking points.\\n3. Summarize any new SEC filings and key technology-related findings.\\n4. Identify any new strategic initiatives or updated technology themes.\\n5. Write a brief executive summary (2-3 sentences) of what changed this week.\\n\\nIf nothing meaningful changed, still produce valid JSON with empty arrays and a summary noting no significant changes.\\n\\nOutput ONLY valid JSON matching the required schema.\"\n    }\n  ]\n}",
         "options": {
           "timeout": 120000
         }
@@ -569,14 +633,14 @@
     "Loop Over Companies": {
       "main": [
         [
-          { "node": "Proxycurl Resolve Company", "type": "main", "index": 0 }
+          { "node": "Apollo Resolve Company", "type": "main", "index": 0 }
         ],
         [
           { "node": "Build Master Summary", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Proxycurl Resolve Company": {
+    "Apollo Resolve Company": {
       "main": [
         [
           { "node": "Wait 1", "type": "main", "index": 0 }
@@ -586,11 +650,11 @@
     "Wait 1": {
       "main": [
         [
-          { "node": "Proxycurl Search IT Leaders", "type": "main", "index": 0 }
+          { "node": "Apollo Search IT Leaders", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Proxycurl Search IT Leaders": {
+    "Apollo Search IT Leaders": {
       "main": [
         [
           { "node": "Wait 2", "type": "main", "index": 0 }

@@ -81,18 +81,14 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://nubela.co/proxycurl/api/linkedin/company/resolve",
+        "url": "https://api.apollo.io/api/v1/organizations/enrich",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             {
-              "name": "company_name",
-              "value": "={{ $json['Company Name'] }}"
-            },
-            {
-              "name": "company_domain",
+              "name": "domain",
               "value": "={{ $json['Website'] }}"
             }
           ]
@@ -101,15 +97,15 @@
           "timeout": 30000
         }
       },
-      "id": "proxycurl-resolve",
-      "name": "Proxycurl Resolve Company",
+      "id": "apollo-resolve",
+      "name": "Apollo Resolve Company",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [880, 400],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "proxycurl-api",
-          "name": "Proxycurl API Key"
+          "id": "apollo-api",
+          "name": "Apollo API Key"
         }
       },
       "onError": "continueRegularOutput",
@@ -128,24 +124,92 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://nubela.co/proxycurl/api/linkedin/company/employees/",
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/mixed_people/api_search",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             {
-              "name": "linkedin_company_profile_url",
-              "value": "={{ $('Proxycurl Resolve Company').item.json.url || $('Loop Over Companies').item.json['LinkedIn URL'] }}"
+              "name": "q_organization_domains",
+              "value": "={{ $json['Website'] || $('Apollo Resolve Company').item.json.primary_domain || '' }}"
             },
             {
-              "name": "keyword_regex",
-              "value": "CIO|CTO|CISO|CDO|Chief Information Officer|Chief Technology Officer|Chief Information Security Officer|Chief Digital Officer|VP of IT|VP Engineering|VP Infrastructure|VP Security|VP Technology|VP Information Systems|Director of IT|Director of Engineering|Director of Infrastructure|Director of Security|Director of Technology"
+              "name": "person_titles[]",
+              "value": "CIO"
             },
             {
-              "name": "enrich_profiles",
-              "value": "enrich"
+              "name": "person_titles[]",
+              "value": "CTO"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "CISO"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "CDO"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Chief Information Officer"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Chief Technology Officer"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Chief Information Security Officer"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Chief Digital Officer"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP of IT"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP Engineering"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP Infrastructure"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP Security"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "VP Technology"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of IT"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of Engineering"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of Infrastructure"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of Security"
+            },
+            {
+              "name": "person_titles[]",
+              "value": "Director of Technology"
+            },
+            {
+              "name": "per_page",
+              "value": "25"
             }
           ]
         },
@@ -153,15 +217,15 @@
           "timeout": 60000
         }
       },
-      "id": "proxycurl-employees",
-      "name": "Proxycurl Search IT Leaders",
+      "id": "apollo-employees",
+      "name": "Apollo Search IT Leaders",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1320, 400],
       "credentials": {
         "httpHeaderAuth": {
-          "id": "proxycurl-api",
-          "name": "Proxycurl API Key"
+          "id": "apollo-api",
+          "name": "Apollo API Key"
         }
       },
       "onError": "continueRegularOutput",
@@ -369,7 +433,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"system\": \"You are an expert business researcher specializing in IT leadership and corporate technology strategy. You analyze company data to produce structured research profiles for sales teams.\\n\\nAlways output valid JSON matching this schema:\\n{\\n  \\\"company\\\": { \\\"name\\\": string, \\\"ticker\\\": string, \\\"website\\\": string },\\n  \\\"it_leaders\\\": [\\n    {\\n      \\\"name\\\": string,\\n      \\\"title\\\": string,\\n      \\\"linkedin_url\\\": string,\\n      \\\"key_background\\\": string,\\n      \\\"talking_points\\\": [string]\\n    }\\n  ],\\n  \\\"strategic_initiatives\\\": [\\n    {\\n      \\\"initiative\\\": string,\\n      \\\"description\\\": string,\\n      \\\"filing_reference\\\": string\\n    }\\n  ],\\n  \\\"technology_themes\\\": [\\n    {\\n      \\\"theme\\\": string,\\n      \\\"priority\\\": \\\"high\\\" | \\\"medium\\\" | \\\"low\\\",\\n      \\\"evidence\\\": string\\n    }\\n  ],\\n  \\\"summary\\\": string\\n}\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Research the following company and produce a structured analysis:\\n\\nCompany: {{ $('Loop Over Companies').item.json['Company Name'] }}\\nTicker: {{ $('Loop Over Companies').item.json['Ticker'] }}\\nWebsite: {{ $('Loop Over Companies').item.json['Website'] }}\\n\\n--- IT LEADERS FROM LINKEDIN (via Proxycurl) ---\\n{{ JSON.stringify($('Proxycurl Search IT Leaders').item.json.employees || $('Proxycurl Search IT Leaders').item.json || [], null, 2) }}\\n\\n--- SEC 10-K FILING EXCERPTS ---\\n{{ $json.filingText || 'No filing data available.' }}\\n\\n--- INSTRUCTIONS ---\\n1. Extract and profile each IT leader found. For each, provide their name, exact title, LinkedIn URL, a brief background summary, and 3-5 personalized talking points a salesperson could use.\\n2. From the 10-K filing, identify strategic IT initiatives, digital transformation efforts, technology investments, and cybersecurity priorities.\\n3. Synthesize overarching technology themes and rate their priority (high/medium/low) based on evidence.\\n4. Write a brief executive summary (2-3 sentences) of the company's IT landscape.\\n\\nOutput ONLY valid JSON matching the required schema.\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"system\": \"You are an expert business researcher specializing in IT leadership and corporate technology strategy. You analyze company data to produce structured research profiles for sales teams.\\n\\nAlways output valid JSON matching this schema:\\n{\\n  \\\"company\\\": { \\\"name\\\": string, \\\"ticker\\\": string, \\\"website\\\": string },\\n  \\\"it_leaders\\\": [\\n    {\\n      \\\"name\\\": string,\\n      \\\"title\\\": string,\\n      \\\"linkedin_url\\\": string,\\n      \\\"key_background\\\": string,\\n      \\\"talking_points\\\": [string]\\n    }\\n  ],\\n  \\\"strategic_initiatives\\\": [\\n    {\\n      \\\"initiative\\\": string,\\n      \\\"description\\\": string,\\n      \\\"filing_reference\\\": string\\n    }\\n  ],\\n  \\\"technology_themes\\\": [\\n    {\\n      \\\"theme\\\": string,\\n      \\\"priority\\\": \\\"high\\\" | \\\"medium\\\" | \\\"low\\\",\\n      \\\"evidence\\\": string\\n    }\\n  ],\\n  \\\"summary\\\": string\\n}\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Research the following company and produce a structured analysis:\\n\\nCompany: {{ $('Loop Over Companies').item.json['Company Name'] }}\\nTicker: {{ $('Loop Over Companies').item.json['Ticker'] }}\\nWebsite: {{ $('Loop Over Companies').item.json['Website'] }}\\n\\n--- IT LEADERS FROM LINKEDIN (via Apollo) ---\\n{{ JSON.stringify($('Apollo Search IT Leaders').item.json.people || $('Apollo Search IT Leaders').item.json || [], null, 2) }}\\n\\n--- SEC 10-K FILING EXCERPTS ---\\n{{ $json.filingText || 'No filing data available.' }}\\n\\n--- INSTRUCTIONS ---\\n1. Extract and profile each IT leader found. For each, provide their name, exact title, LinkedIn URL, a brief background summary, and 3-5 personalized talking points a salesperson could use.\\n2. From the 10-K filing, identify strategic IT initiatives, digital transformation efforts, technology investments, and cybersecurity priorities.\\n3. Synthesize overarching technology themes and rate their priority (high/medium/low) based on evidence.\\n4. Write a brief executive summary (2-3 sentences) of the company's IT landscape.\\n\\nOutput ONLY valid JSON matching the required schema.\"\n    }\n  ]\n}",
         "options": {
           "timeout": 120000
         }
@@ -638,12 +702,12 @@
     "Loop Over Companies": {
       "main": [
         [
-          { "node": "Proxycurl Resolve Company", "type": "main", "index": 0 }
+          { "node": "Apollo Resolve Company", "type": "main", "index": 0 }
         ],
         []
       ]
     },
-    "Proxycurl Resolve Company": {
+    "Apollo Resolve Company": {
       "main": [
         [
           { "node": "Wait After Resolve", "type": "main", "index": 0 }
@@ -653,11 +717,11 @@
     "Wait After Resolve": {
       "main": [
         [
-          { "node": "Proxycurl Search IT Leaders", "type": "main", "index": 0 }
+          { "node": "Apollo Search IT Leaders", "type": "main", "index": 0 }
         ]
       ]
     },
-    "Proxycurl Search IT Leaders": {
+    "Apollo Search IT Leaders": {
       "main": [
         [
           { "node": "Wait After Employees", "type": "main", "index": 0 }
