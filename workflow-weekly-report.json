@@ -1,0 +1,704 @@
+{
+  "name": "Weekly Report Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Every Monday 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 400]
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [220, 580]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Companies",
+          "mode": "list"
+        }
+      },
+      "id": "read-companies",
+      "name": "Read Companies",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 480],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "loop-companies",
+      "name": "Loop Over Companies",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://nubela.co/proxycurl/api/linkedin/company/resolve",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "company_name",
+              "value": "={{ $json['Company Name'] }}"
+            },
+            {
+              "name": "company_domain",
+              "value": "={{ $json['Website'] }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "proxycurl-resolve",
+      "name": "Proxycurl Resolve Company",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 480],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "proxycurl-api",
+          "name": "Proxycurl API Key"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "id": "wait-1",
+      "name": "Wait 1",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1120, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://nubela.co/proxycurl/api/linkedin/company/employees/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "linkedin_company_profile_url",
+              "value": "={{ $('Proxycurl Resolve Company').item.json.url || $('Loop Over Companies').item.json['LinkedIn URL'] }}"
+            },
+            {
+              "name": "keyword_regex",
+              "value": "CIO|CTO|CISO|CDO|Chief Information Officer|Chief Technology Officer|Chief Information Security Officer|Chief Digital Officer|VP of IT|VP Engineering|VP Infrastructure|VP Security|VP Technology|VP Information Systems|Director of IT|Director of Engineering|Director of Infrastructure|Director of Security|Director of Technology"
+            },
+            {
+              "name": "enrich_profiles",
+              "value": "enrich"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "proxycurl-employees",
+      "name": "Proxycurl Search IT Leaders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 480],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "proxycurl-api",
+          "name": "Proxycurl API Key"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-2",
+      "name": "Wait 2",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1560, 480]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://efts.sec.gov/LATEST/search-index",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $('Loop Over Companies').item.json['Company Name'] }}"
+            },
+            {
+              "name": "dateRange",
+              "value": "custom"
+            },
+            {
+              "name": "startdt",
+              "value": "={{ $('Loop Over Companies').item.json['Last Researched'] || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }}"
+            },
+            {
+              "name": "enddt",
+              "value": "={{ new Date().toISOString().split('T')[0] }}"
+            },
+            {
+              "name": "forms",
+              "value": "10-K"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "={{ $env.SEC_EDGAR_USER_AGENT || 'CompanyResearch/1.0 (research@example.com)' }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "sec-edgar-search",
+      "name": "SEC EDGAR Check New Filings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 480],
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 0.5,
+        "unit": "seconds"
+      },
+      "id": "wait-3",
+      "name": "Wait 3",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2000, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const searchResult = $('SEC EDGAR Check New Filings').item.json;\n\nlet newFilings = [];\ntry {\n  const hits = searchResult.hits?.hits || searchResult.hits || [];\n  if (Array.isArray(hits)) {\n    newFilings = hits.slice(0, 3).map(h => {\n      const s = h._source || h;\n      return {\n        form: s.form_type || s.forms || '10-K',\n        date: s.file_date || s.date_filed || '',\n        company: s.entity_name || s.display_names?.[0] || '',\n        url: s.file_url || '',\n        accession: s.accession_no || ''\n      };\n    });\n  }\n} catch (e) {\n  // Continue with empty\n}\n\nreturn {\n  newFilings,\n  hasNewFilings: newFilings.length > 0\n};"
+      },
+      "id": "parse-new-filings",
+      "name": "Parse New Filings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 480]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leaders",
+          "mode": "list"
+        },
+        "filters": {
+          "values": [
+            {
+              "lookupColumn": "Company",
+              "lookupValue": "={{ $('Loop Over Companies').item.json['Company Name'] }}"
+            }
+          ]
+        }
+      },
+      "id": "read-existing-leaders",
+      "name": "Read Existing Leaders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2220, 660],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"system\": \"You are an expert business researcher producing weekly incremental updates on IT leadership changes and corporate technology strategy. You compare new data against existing records to identify what is NEW and what has CHANGED.\\n\\nAlways output valid JSON matching this schema:\\n{\\n  \\\"company\\\": string,\\n  \\\"week_of\\\": string,\\n  \\\"new_leaders\\\": [{ \\\"name\\\": string, \\\"title\\\": string, \\\"linkedin_url\\\": string, \\\"background\\\": string, \\\"talking_points\\\": [string] }],\\n  \\\"changed_leaders\\\": [{ \\\"name\\\": string, \\\"previous_title\\\": string, \\\"new_title\\\": string, \\\"change_summary\\\": string }],\\n  \\\"departed_leaders\\\": [{ \\\"name\\\": string, \\\"previous_title\\\": string }],\\n  \\\"new_filings\\\": [{ \\\"form\\\": string, \\\"date\\\": string, \\\"key_findings\\\": string }],\\n  \\\"new_initiatives\\\": [{ \\\"initiative\\\": string, \\\"description\\\": string }],\\n  \\\"updated_themes\\\": [{ \\\"theme\\\": string, \\\"update\\\": string }],\\n  \\\"executive_summary\\\": string\\n}\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate a weekly delta report for the following company:\\n\\nCompany: {{ $('Loop Over Companies').item.json['Company Name'] }}\\nWeek of: {{ new Date().toISOString().split('T')[0] }}\\n\\n--- CURRENT IT LEADERS FROM LINKEDIN (fresh Proxycurl data) ---\\n{{ JSON.stringify($('Proxycurl Search IT Leaders').item.json.employees || $('Proxycurl Search IT Leaders').item.json || [], null, 2) }}\\n\\n--- PREVIOUSLY KNOWN LEADERS (from our database) ---\\n{{ JSON.stringify($('Read Existing Leaders').item.json || [], null, 2) }}\\n\\n--- NEW SEC FILINGS SINCE LAST CHECK ---\\n{{ JSON.stringify($('Parse New Filings').item.json.newFilings || [], null, 2) }}\\n\\n--- INSTRUCTIONS ---\\n1. Compare the current LinkedIn leaders against previously known leaders. Identify:\\n   - NEW leaders (in current data but not in previous)\\n   - CHANGED leaders (same person but different title)\\n   - DEPARTED leaders (in previous data but not in current)\\n2. For new leaders, provide background and 3-5 talking points.\\n3. Summarize any new SEC filings and key technology-related findings.\\n4. Identify any new strategic initiatives or updated technology themes.\\n5. Write a brief executive summary (2-3 sentences) of what changed this week.\\n\\nIf nothing meaningful changed, still produce valid JSON with empty arrays and a summary noting no significant changes.\\n\\nOutput ONLY valid JSON matching the required schema.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "claude-delta-analysis",
+      "name": "Claude Delta Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2500, 480],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropic-api",
+          "name": "Anthropic API Key"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $('Claude Delta Analysis').item.json;\nconst companyData = $('Loop Over Companies').item.json;\nconst weekOf = new Date().toISOString().split('T')[0];\n\nlet delta = {};\ntry {\n  const content = response.content?.[0]?.text || response.content || '{}';\n  let jsonStr = content;\n  const jsonMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (jsonMatch) jsonStr = jsonMatch[1];\n  delta = JSON.parse(jsonStr.trim());\n} catch (e) {\n  delta = {\n    company: companyData['Company Name'],\n    week_of: weekOf,\n    new_leaders: [],\n    changed_leaders: [],\n    departed_leaders: [],\n    new_filings: [],\n    new_initiatives: [],\n    updated_themes: [],\n    executive_summary: 'Weekly analysis could not be parsed.'\n  };\n}\n\n// Build the weekly update section for the Google Doc\nconst lines = [\n  `### Week of ${weekOf}`,\n  '',\n  `**Summary:** ${delta.executive_summary || 'No significant changes detected.'}`,\n  ''\n];\n\nif ((delta.new_leaders || []).length > 0) {\n  lines.push('#### New Leaders Found');\n  for (const l of delta.new_leaders) {\n    lines.push(`- **${l.name}** - ${l.title}`);\n    lines.push(`  - LinkedIn: ${l.linkedin_url || 'N/A'}`);\n    lines.push(`  - Background: ${l.background || 'N/A'}`);\n    if (l.talking_points?.length) {\n      lines.push('  - Talking Points:');\n      for (const tp of l.talking_points) lines.push(`    - ${tp}`);\n    }\n  }\n  lines.push('');\n}\n\nif ((delta.changed_leaders || []).length > 0) {\n  lines.push('#### Role Changes');\n  for (const l of delta.changed_leaders) {\n    lines.push(`- **${l.name}**: ${l.previous_title} → ${l.new_title}`);\n    lines.push(`  - ${l.change_summary || ''}`);\n  }\n  lines.push('');\n}\n\nif ((delta.departed_leaders || []).length > 0) {\n  lines.push('#### Departed Leaders');\n  for (const l of delta.departed_leaders) {\n    lines.push(`- **${l.name}** (was ${l.previous_title})`);\n  }\n  lines.push('');\n}\n\nif ((delta.new_filings || []).length > 0) {\n  lines.push('#### New SEC Filings');\n  for (const f of delta.new_filings) {\n    lines.push(`- **${f.form}** (${f.date}): ${f.key_findings || 'N/A'}`);\n  }\n  lines.push('');\n}\n\nif ((delta.new_initiatives || []).length > 0) {\n  lines.push('#### New Initiatives');\n  for (const i of delta.new_initiatives) {\n    lines.push(`- **${i.initiative}**: ${i.description}`);\n  }\n  lines.push('');\n}\n\nif ((delta.updated_themes || []).length > 0) {\n  lines.push('#### Updated Themes');\n  for (const t of delta.updated_themes) {\n    lines.push(`- **${t.theme}**: ${t.update}`);\n  }\n  lines.push('');\n}\n\nlines.push('---');\nlines.push('');\n\n// Prepare new leader rows for the Leaders sheet\nconst newLeaderRows = (delta.new_leaders || []).map(l => ({\n  'Company': companyData['Company Name'],\n  'Name': l.name,\n  'Title': l.title,\n  'LinkedIn URL': l.linkedin_url || '',\n  'Key Background': l.background || '',\n  'Talking Points': (l.talking_points || []).join('; '),\n  'Date Found': weekOf\n}));\n\n// For the master summary\nconst masterSummaryLine = `**${companyData['Company Name']}:** ${delta.executive_summary || 'No changes.'}`;\n\nreturn {\n  delta,\n  weeklyUpdateText: lines.join('\\n'),\n  newLeaderRows,\n  masterSummaryLine,\n  companyName: companyData['Company Name'],\n  weekOf\n};"
+      },
+      "id": "format-weekly-delta",
+      "name": "Format Weekly Delta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2720, 480]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Companies",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company Name": "={{ $json.companyName }}",
+            "Status": "Updated",
+            "Last Researched": "={{ $json.weekOf }}"
+          },
+          "matchingColumns": ["Company Name"],
+          "schema": [
+            { "id": "Company Name", "displayName": "Company Name", "type": "string", "canBeUsedToMatch": true, "defaultMatch": true },
+            { "id": "Status", "displayName": "Status", "type": "string" },
+            { "id": "Last Researched", "displayName": "Last Researched", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-last-researched",
+      "name": "Update Last Researched",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2940, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Search Google Drive for the company's existing research doc\n// This is a placeholder - in practice you'd use the Google Drive node to search\n// The doc title follows the pattern: \"<Company Name> - IT Leadership Research\"\nconst companyName = $('Format Weekly Delta').item.json.companyName;\nreturn {\n  searchTitle: `${companyName} - IT Leadership Research`,\n  updateText: $('Format Weekly Delta').item.json.weeklyUpdateText,\n  companyName\n};"
+      },
+      "id": "prepare-doc-update",
+      "name": "Prepare Doc Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2940, 480]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "docId": "={{ $env['COMPANY_DOC_' + $json.companyName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()] || '' }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ $json.updateText }}",
+              "locationChoice": "endOfDocument"
+            }
+          ]
+        }
+      },
+      "id": "append-to-company-doc",
+      "name": "Append to Company Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 1,
+      "position": [3160, 480],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-new-leaders",
+              "leftValue": "={{ $('Format Weekly Delta').item.json.newLeaderRows.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-new-leaders",
+      "name": "New Leaders Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2940, 660]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leaders",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company": "={{ $json.Company }}",
+            "Name": "={{ $json.Name }}",
+            "Title": "={{ $json.Title }}",
+            "LinkedIn URL": "={{ $json['LinkedIn URL'] }}",
+            "Key Background": "={{ $json['Key Background'] }}",
+            "Talking Points": "={{ $json['Talking Points'] }}",
+            "Date Found": "={{ $json['Date Found'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Company", "displayName": "Company", "type": "string" },
+            { "id": "Name", "displayName": "Name", "type": "string" },
+            { "id": "Title", "displayName": "Title", "type": "string" },
+            { "id": "LinkedIn URL", "displayName": "LinkedIn URL", "type": "string" },
+            { "id": "Key Background", "displayName": "Key Background", "type": "string" },
+            { "id": "Talking Points", "displayName": "Talking Points", "type": "string" },
+            { "id": "Date Found", "displayName": "Date Found", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "write-new-leaders",
+      "name": "Write New Leaders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3160, 660],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect the master summary line from each company iteration\n// Store it on the workflow's static data for the final summary node\nconst summary = $('Format Weekly Delta').item.json.masterSummaryLine;\nconst companyName = $('Format Weekly Delta').item.json.companyName;\n\nreturn {\n  companyName,\n  summaryLine: summary\n};"
+      },
+      "id": "collect-summary",
+      "name": "Collect Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3380, 480]
+    },
+    {
+      "parameters": {},
+      "id": "loop-back",
+      "name": "Loop Back",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [3600, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "// After the loop completes, gather all summary items\n// The splitInBatches node's \"done\" output triggers this\nconst items = $input.all();\nconst weekOf = new Date().toISOString().split('T')[0];\n\nconst lines = [\n  `# Weekly Research Summary - Week of ${weekOf}`,\n  '',\n  '## Company Updates',\n  ''\n];\n\nfor (const item of items) {\n  lines.push(item.json.summaryLine || `- ${item.json.companyName || 'Unknown'}: No data`);\n  lines.push('');\n}\n\nlines.push('---');\nlines.push('');\nlines.push(`_Generated automatically on ${weekOf}_`);\n\nreturn {\n  masterSummaryText: lines.join('\\n'),\n  weekOf\n};"
+      },
+      "id": "build-master-summary",
+      "name": "Build Master Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3820, 480]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "docId": "={{ $env.MASTER_SUMMARY_DOC_ID || '' }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ $json.masterSummaryText }}",
+              "locationChoice": "endOfDocument"
+            }
+          ]
+        }
+      },
+      "id": "update-master-doc",
+      "name": "Append Master Summary Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 1,
+      "position": [4040, 480],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Every Monday 8am": {
+      "main": [
+        [
+          { "node": "Read Companies", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          { "node": "Read Companies", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read Companies": {
+      "main": [
+        [
+          { "node": "Loop Over Companies", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Loop Over Companies": {
+      "main": [
+        [
+          { "node": "Proxycurl Resolve Company", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Build Master Summary", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Proxycurl Resolve Company": {
+      "main": [
+        [
+          { "node": "Wait 1", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait 1": {
+      "main": [
+        [
+          { "node": "Proxycurl Search IT Leaders", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Proxycurl Search IT Leaders": {
+      "main": [
+        [
+          { "node": "Wait 2", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait 2": {
+      "main": [
+        [
+          { "node": "SEC EDGAR Check New Filings", "type": "main", "index": 0 },
+          { "node": "Read Existing Leaders", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "SEC EDGAR Check New Filings": {
+      "main": [
+        [
+          { "node": "Wait 3", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait 3": {
+      "main": [
+        [
+          { "node": "Parse New Filings", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse New Filings": {
+      "main": [
+        [
+          { "node": "Claude Delta Analysis", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read Existing Leaders": {
+      "main": [
+        [
+          { "node": "Claude Delta Analysis", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Claude Delta Analysis": {
+      "main": [
+        [
+          { "node": "Format Weekly Delta", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Format Weekly Delta": {
+      "main": [
+        [
+          { "node": "Update Last Researched", "type": "main", "index": 0 },
+          { "node": "Prepare Doc Update", "type": "main", "index": 0 },
+          { "node": "New Leaders Found?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Update Last Researched": {
+      "main": [
+        [
+          { "node": "Collect Summary", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Prepare Doc Update": {
+      "main": [
+        [
+          { "node": "Append to Company Doc", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "New Leaders Found?": {
+      "main": [
+        [
+          { "node": "Write New Leaders", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Collect Summary": {
+      "main": [
+        [
+          { "node": "Loop Back", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Loop Back": {
+      "main": [
+        [
+          { "node": "Loop Over Companies", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build Master Summary": {
+      "main": [
+        [
+          { "node": "Append Master Summary Doc", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-30T00:00:00.000Z",
+  "versionId": "1"
+}

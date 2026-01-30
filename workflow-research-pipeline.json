@@ -1,0 +1,800 @@
+{
+  "name": "Company Research Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Companies",
+          "mode": "list"
+        },
+        "event": "rowAdded"
+      },
+      "id": "trigger-sheets",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [220, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [220, 520]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Companies",
+          "mode": "list"
+        }
+      },
+      "id": "read-all-companies",
+      "name": "Read All Companies",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [440, 520],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "loop-companies",
+      "name": "Loop Over Companies",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [660, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://nubela.co/proxycurl/api/linkedin/company/resolve",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "company_name",
+              "value": "={{ $json['Company Name'] }}"
+            },
+            {
+              "name": "company_domain",
+              "value": "={{ $json['Website'] }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "proxycurl-resolve",
+      "name": "Proxycurl Resolve Company",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "proxycurl-api",
+          "name": "Proxycurl API Key"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "id": "wait-after-resolve",
+      "name": "Wait After Resolve",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://nubela.co/proxycurl/api/linkedin/company/employees/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "linkedin_company_profile_url",
+              "value": "={{ $('Proxycurl Resolve Company').item.json.url || $('Loop Over Companies').item.json['LinkedIn URL'] }}"
+            },
+            {
+              "name": "keyword_regex",
+              "value": "CIO|CTO|CISO|CDO|Chief Information Officer|Chief Technology Officer|Chief Information Security Officer|Chief Digital Officer|VP of IT|VP Engineering|VP Infrastructure|VP Security|VP Technology|VP Information Systems|Director of IT|Director of Engineering|Director of Infrastructure|Director of Security|Director of Technology"
+            },
+            {
+              "name": "enrich_profiles",
+              "value": "enrich"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "proxycurl-employees",
+      "name": "Proxycurl Search IT Leaders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "proxycurl-api",
+          "name": "Proxycurl API Key"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-after-employees",
+      "name": "Wait After Employees",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1540, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://efts.sec.gov/LATEST/search-index",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $('Loop Over Companies').item.json['Company Name'] }}"
+            },
+            {
+              "name": "dateRange",
+              "value": "custom"
+            },
+            {
+              "name": "startdt",
+              "value": "={{ new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }}"
+            },
+            {
+              "name": "enddt",
+              "value": "={{ new Date().toISOString().split('T')[0] }}"
+            },
+            {
+              "name": "forms",
+              "value": "10-K"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "={{ $env.SEC_EDGAR_USER_AGENT || 'CompanyResearch/1.0 (research@example.com)' }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "sec-edgar-search",
+      "name": "SEC EDGAR Search 10-K",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 400],
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 0.5,
+        "unit": "seconds"
+      },
+      "id": "wait-after-edgar-search",
+      "name": "Wait After EDGAR Search",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1980, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const searchResult = $('SEC EDGAR Search 10-K').item.json;\n\nlet filingUrl = null;\nlet filings = [];\n\ntry {\n  // Parse the EDGAR search results to find the most recent 10-K filing URL\n  const hits = searchResult.hits?.hits || searchResult.hits || [];\n  \n  if (Array.isArray(hits) && hits.length > 0) {\n    const firstHit = hits[0];\n    const source = firstHit._source || firstHit;\n    \n    // Build the filing URL from EDGAR data\n    const accessionNumber = source.file_num || source.accession_no || '';\n    const fileUrl = source.file_url || '';\n    \n    if (fileUrl) {\n      filingUrl = fileUrl.startsWith('http') ? fileUrl : `https://www.sec.gov${fileUrl}`;\n    } else if (source.accession_no) {\n      // Build URL from accession number\n      const cleanAccession = source.accession_no.replace(/-/g, '');\n      filingUrl = `https://www.sec.gov/Archives/edgar/data/${source.entity_id || ''}/${cleanAccession}/${source.accession_no}-index.htm`;\n    }\n    \n    filings = hits.slice(0, 3).map(h => {\n      const s = h._source || h;\n      return {\n        form: s.form_type || s.forms || '10-K',\n        date: s.file_date || s.date_filed || '',\n        company: s.entity_name || s.display_names?.[0] || '',\n        url: s.file_url || ''\n      };\n    });\n  }\n} catch (e) {\n  // Continue with null filingUrl\n}\n\nreturn {\n  filingUrl,\n  filings,\n  rawResultAvailable: !!searchResult\n};"
+      },
+      "id": "parse-edgar-results",
+      "name": "Parse EDGAR Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-filing-url",
+              "leftValue": "={{ $json.filingUrl }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-filing-exists",
+      "name": "Filing Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2420, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Parse EDGAR Results').item.json.filingUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "={{ $env.SEC_EDGAR_USER_AGENT || 'CompanyResearch/1.0 (research@example.com)' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "fetch-10k-filing",
+      "name": "Fetch 10-K Filing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2640, 300],
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $('Fetch 10-K Filing').item.json.data || $('Fetch 10-K Filing').item.json.body || '';\n\n// Extract text content from HTML, focusing on IT/technology sections\nlet text = html;\n\n// Strip HTML tags\ntext = text.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '');\ntext = text.replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '');\ntext = text.replace(/<[^>]+>/g, ' ');\ntext = text.replace(/&nbsp;/g, ' ');\ntext = text.replace(/&amp;/g, '&');\ntext = text.replace(/&lt;/g, '<');\ntext = text.replace(/&gt;/g, '>');\ntext = text.replace(/\\s+/g, ' ');\n\n// Limit to ~50k chars to stay within API limits\nif (text.length > 50000) {\n  // Try to find technology-related sections\n  const techKeywords = ['technology', 'information systems', 'digital', 'cybersecurity',\n    'information technology', 'IT infrastructure', 'cloud', 'data center',\n    'software', 'artificial intelligence', 'machine learning', 'automation'];\n  \n  let relevantSections = [];\n  \n  for (const keyword of techKeywords) {\n    const idx = text.toLowerCase().indexOf(keyword);\n    if (idx !== -1) {\n      const start = Math.max(0, idx - 500);\n      const end = Math.min(text.length, idx + 2000);\n      relevantSections.push(text.substring(start, end));\n    }\n  }\n  \n  if (relevantSections.length > 0) {\n    text = relevantSections.join('\\n\\n---SECTION BREAK---\\n\\n');\n  } else {\n    // Fallback: take first 50k chars\n    text = text.substring(0, 50000);\n  }\n}\n\nreturn {\n  filingText: text,\n  filingUrl: $('Parse EDGAR Results').item.json.filingUrl,\n  filings: $('Parse EDGAR Results').item.json.filings\n};"
+      },
+      "id": "extract-filing-text",
+      "name": "Extract Filing Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2860, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  filingText: 'No 10-K filing found for this company in the past year.',\n  filingUrl: null,\n  filings: $('Parse EDGAR Results').item.json.filings || []\n};"
+      },
+      "id": "no-filing-placeholder",
+      "name": "No Filing Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 500]
+    },
+    {
+      "parameters": {},
+      "id": "merge-filing-data",
+      "name": "Merge Filing Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [3080, 400],
+      "parameters_extra": {
+        "mode": "passThrough",
+        "output": "input1"
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 4096,\n  \"system\": \"You are an expert business researcher specializing in IT leadership and corporate technology strategy. You analyze company data to produce structured research profiles for sales teams.\\n\\nAlways output valid JSON matching this schema:\\n{\\n  \\\"company\\\": { \\\"name\\\": string, \\\"ticker\\\": string, \\\"website\\\": string },\\n  \\\"it_leaders\\\": [\\n    {\\n      \\\"name\\\": string,\\n      \\\"title\\\": string,\\n      \\\"linkedin_url\\\": string,\\n      \\\"key_background\\\": string,\\n      \\\"talking_points\\\": [string]\\n    }\\n  ],\\n  \\\"strategic_initiatives\\\": [\\n    {\\n      \\\"initiative\\\": string,\\n      \\\"description\\\": string,\\n      \\\"filing_reference\\\": string\\n    }\\n  ],\\n  \\\"technology_themes\\\": [\\n    {\\n      \\\"theme\\\": string,\\n      \\\"priority\\\": \\\"high\\\" | \\\"medium\\\" | \\\"low\\\",\\n      \\\"evidence\\\": string\\n    }\\n  ],\\n  \\\"summary\\\": string\\n}\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Research the following company and produce a structured analysis:\\n\\nCompany: {{ $('Loop Over Companies').item.json['Company Name'] }}\\nTicker: {{ $('Loop Over Companies').item.json['Ticker'] }}\\nWebsite: {{ $('Loop Over Companies').item.json['Website'] }}\\n\\n--- IT LEADERS FROM LINKEDIN (via Proxycurl) ---\\n{{ JSON.stringify($('Proxycurl Search IT Leaders').item.json.employees || $('Proxycurl Search IT Leaders').item.json || [], null, 2) }}\\n\\n--- SEC 10-K FILING EXCERPTS ---\\n{{ $json.filingText || 'No filing data available.' }}\\n\\n--- INSTRUCTIONS ---\\n1. Extract and profile each IT leader found. For each, provide their name, exact title, LinkedIn URL, a brief background summary, and 3-5 personalized talking points a salesperson could use.\\n2. From the 10-K filing, identify strategic IT initiatives, digital transformation efforts, technology investments, and cybersecurity priorities.\\n3. Synthesize overarching technology themes and rate their priority (high/medium/low) based on evidence.\\n4. Write a brief executive summary (2-3 sentences) of the company's IT landscape.\\n\\nOutput ONLY valid JSON matching the required schema.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "claude-analysis",
+      "name": "Claude Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropic-api",
+          "name": "Anthropic API Key"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $('Claude Analysis').item.json;\nconst companyData = $('Loop Over Companies').item.json;\n\nlet analysis = {};\ntry {\n  const content = response.content?.[0]?.text || response.content || '{}';\n  // Try to extract JSON from the response (handle markdown code blocks)\n  let jsonStr = content;\n  const jsonMatch = content.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (jsonMatch) {\n    jsonStr = jsonMatch[1];\n  }\n  analysis = JSON.parse(jsonStr.trim());\n} catch (e) {\n  analysis = {\n    company: { name: companyData['Company Name'], ticker: companyData['Ticker'], website: companyData['Website'] },\n    it_leaders: [],\n    strategic_initiatives: [],\n    technology_themes: [],\n    summary: 'Analysis could not be parsed. Raw response available.'\n  };\n}\n\n// Prepare rows for the Leaders sheet\nconst leaderRows = (analysis.it_leaders || []).map(leader => ({\n  'Company': companyData['Company Name'],\n  'Name': leader.name,\n  'Title': leader.title,\n  'LinkedIn URL': leader.linkedin_url || '',\n  'Key Background': leader.key_background || '',\n  'Talking Points': (leader.talking_points || []).join('; '),\n  'Date Found': new Date().toISOString().split('T')[0]\n}));\n\n// Prepare Google Doc content\nconst docLines = [\n  `# ${companyData['Company Name']} - IT Leadership Research`,\n  '',\n  `**Generated:** ${new Date().toISOString().split('T')[0]}`,\n  '',\n  '## Company Overview',\n  `- **Ticker:** ${companyData['Ticker'] || 'N/A'}`,\n  `- **Website:** ${companyData['Website'] || 'N/A'}`,\n  `- **Summary:** ${analysis.summary || 'N/A'}`,\n  '',\n  '## Key IT Leaders',\n  ''\n];\n\nfor (const leader of (analysis.it_leaders || [])) {\n  docLines.push(`### ${leader.name} - ${leader.title}`);\n  docLines.push(`- **LinkedIn:** ${leader.linkedin_url || 'N/A'}`);\n  docLines.push(`- **Background:** ${leader.key_background || 'N/A'}`);\n  docLines.push('- **Talking Points:**');\n  for (const tp of (leader.talking_points || [])) {\n    docLines.push(`  - ${tp}`);\n  }\n  docLines.push('');\n}\n\ndocLines.push('## Strategic Initiatives (from 10-K)');\ndocLines.push('');\nfor (const init of (analysis.strategic_initiatives || [])) {\n  docLines.push(`### ${init.initiative}`);\n  docLines.push(`${init.description}`);\n  if (init.filing_reference) docLines.push(`_Source: ${init.filing_reference}_`);\n  docLines.push('');\n}\n\ndocLines.push('## Technology Themes');\ndocLines.push('');\nfor (const theme of (analysis.technology_themes || [])) {\n  docLines.push(`- **${theme.theme}** (Priority: ${theme.priority}) - ${theme.evidence}`);\n}\ndocLines.push('');\ndocLines.push('---');\ndocLines.push('## Weekly Updates');\ndocLines.push('');\n\nreturn {\n  analysis,\n  leaderRows,\n  docContent: docLines.join('\\n'),\n  companyName: companyData['Company Name']\n};"
+      },
+      "id": "format-results",
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3520, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leaders",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company": "={{ $json.leaderRows[0]?.Company || '' }}",
+            "Name": "={{ $json.leaderRows[0]?.Name || '' }}",
+            "Title": "={{ $json.leaderRows[0]?.Title || '' }}",
+            "LinkedIn URL": "={{ $json.leaderRows[0]?.['LinkedIn URL'] || '' }}",
+            "Key Background": "={{ $json.leaderRows[0]?.['Key Background'] || '' }}",
+            "Talking Points": "={{ $json.leaderRows[0]?.['Talking Points'] || '' }}",
+            "Date Found": "={{ $json.leaderRows[0]?.['Date Found'] || '' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Company", "displayName": "Company", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "Name", "displayName": "Name", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "Title", "displayName": "Title", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "LinkedIn URL", "displayName": "LinkedIn URL", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "Key Background", "displayName": "Key Background", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "Talking Points", "displayName": "Talking Points", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "Date Found", "displayName": "Date Found", "required": false, "defaultMatch": false, "canBeUsedToMatch": true, "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "write-leaders-sheet",
+      "name": "Write Leaders to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3740, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const formatResults = $('Format Results').item.json;\n\n// Write all leader rows (the Sheets node above handles the first row;\n// this Code node emits the remaining rows for a second append if needed)\nconst leaderRows = formatResults.leaderRows || [];\nconst items = [];\n\nfor (let i = 1; i < leaderRows.length; i++) {\n  items.push(leaderRows[i]);\n}\n\nif (items.length === 0) {\n  items.push({ _noMoreRows: true });\n}\n\nreturn items;"
+      },
+      "id": "emit-remaining-leaders",
+      "name": "Emit Remaining Leaders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3960, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-more-rows",
+              "leftValue": "={{ $json._noMoreRows }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "more-leaders-check",
+      "name": "More Leaders?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [4180, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leaders",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company": "={{ $json.Company }}",
+            "Name": "={{ $json.Name }}",
+            "Title": "={{ $json.Title }}",
+            "LinkedIn URL": "={{ $json['LinkedIn URL'] }}",
+            "Key Background": "={{ $json['Key Background'] }}",
+            "Talking Points": "={{ $json['Talking Points'] }}",
+            "Date Found": "={{ $json['Date Found'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Company", "displayName": "Company", "type": "string" },
+            { "id": "Name", "displayName": "Name", "type": "string" },
+            { "id": "Title", "displayName": "Title", "type": "string" },
+            { "id": "LinkedIn URL", "displayName": "LinkedIn URL", "type": "string" },
+            { "id": "Key Background", "displayName": "Key Background", "type": "string" },
+            { "id": "Talking Points", "displayName": "Talking Points", "type": "string" },
+            { "id": "Date Found", "displayName": "Date Found", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "write-remaining-leaders",
+      "name": "Write Remaining Leaders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [4400, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "title": "={{ $('Format Results').item.json.companyName }} - IT Leadership Research",
+        "content": "={{ $('Format Results').item.json.docContent }}",
+        "folderId": "={{ $env.GOOGLE_DRIVE_FOLDER_ID || '' }}",
+        "options": {}
+      },
+      "id": "create-google-doc",
+      "name": "Create Company Research Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 1,
+      "position": [3740, 520],
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Companies",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company Name": "={{ $('Loop Over Companies').item.json['Company Name'] }}",
+            "Status": "Researched",
+            "Last Researched": "={{ new Date().toISOString().split('T')[0] }}"
+          },
+          "matchingColumns": ["Company Name"],
+          "schema": [
+            { "id": "Company Name", "displayName": "Company Name", "type": "string", "canBeUsedToMatch": true, "defaultMatch": true },
+            { "id": "Status", "displayName": "Status", "type": "string" },
+            { "id": "Last Researched", "displayName": "Last Researched", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "update-company-status",
+      "name": "Update Company Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3960, 520],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-oauth2",
+          "name": "Google OAuth2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "loop-back",
+      "name": "Loop Back",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [4400, 520]
+    }
+  ],
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          { "node": "Loop Over Companies", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          { "node": "Read All Companies", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Read All Companies": {
+      "main": [
+        [
+          { "node": "Loop Over Companies", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Loop Over Companies": {
+      "main": [
+        [
+          { "node": "Proxycurl Resolve Company", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Proxycurl Resolve Company": {
+      "main": [
+        [
+          { "node": "Wait After Resolve", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait After Resolve": {
+      "main": [
+        [
+          { "node": "Proxycurl Search IT Leaders", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Proxycurl Search IT Leaders": {
+      "main": [
+        [
+          { "node": "Wait After Employees", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait After Employees": {
+      "main": [
+        [
+          { "node": "SEC EDGAR Search 10-K", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "SEC EDGAR Search 10-K": {
+      "main": [
+        [
+          { "node": "Wait After EDGAR Search", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Wait After EDGAR Search": {
+      "main": [
+        [
+          { "node": "Parse EDGAR Results", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse EDGAR Results": {
+      "main": [
+        [
+          { "node": "Filing Found?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Filing Found?": {
+      "main": [
+        [
+          { "node": "Fetch 10-K Filing", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "No Filing Found", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch 10-K Filing": {
+      "main": [
+        [
+          { "node": "Extract Filing Text", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract Filing Text": {
+      "main": [
+        [
+          { "node": "Merge Filing Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "No Filing Found": {
+      "main": [
+        [
+          { "node": "Merge Filing Data", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Merge Filing Data": {
+      "main": [
+        [
+          { "node": "Claude Analysis", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Claude Analysis": {
+      "main": [
+        [
+          { "node": "Format Results", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Format Results": {
+      "main": [
+        [
+          { "node": "Write Leaders to Sheet", "type": "main", "index": 0 },
+          { "node": "Create Company Research Doc", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Write Leaders to Sheet": {
+      "main": [
+        [
+          { "node": "Emit Remaining Leaders", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Emit Remaining Leaders": {
+      "main": [
+        [
+          { "node": "More Leaders?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "More Leaders?": {
+      "main": [
+        [
+          { "node": "Write Remaining Leaders", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Create Company Research Doc": {
+      "main": [
+        [
+          { "node": "Update Company Status", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Update Company Status": {
+      "main": [
+        [
+          { "node": "Loop Back", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Loop Back": {
+      "main": [
+        [
+          { "node": "Loop Over Companies", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-30T00:00:00.000Z",
+  "versionId": "1"
+}
