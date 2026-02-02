@@ -9,7 +9,9 @@
 - This repo contains two n8n workflow JSON files for company IT leadership research
 - **workflow-research-pipeline.json** — triggered on new Google Sheet row, researches a company end-to-end
 - **workflow-weekly-report.json** — runs weekly on cron, produces delta reports on leadership changes
-- External services: Anthropic Claude API, Google Sheets/Docs/Drive, SEC EDGAR, LinkedIn data (currently Apollo.io, may migrate to Google Custom Search)
+- External services: Anthropic Claude API, Google Sheets/Docs/Drive, SEC EDGAR, SearXNG (self-hosted, LinkedIn X-ray search)
+- SearXNG runs locally (default `http://localhost:8080`), configured via `SEARXNG_URL` env var
+- LinkedIn data is gathered via X-ray search (`site:linkedin.com/in` queries), parsed by a Code node
 - **test-dry-run.js** — offline validation script (schema, connections, references, code execution, Claude prompts)
 
 ## Tech Stack

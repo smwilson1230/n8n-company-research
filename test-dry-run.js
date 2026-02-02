@@ -62,29 +62,49 @@ for (const file of WORKFLOW_FILES) {
 
 // ─── Mock data ──────────────────────────────────────────────────────────────
 
-const MOCK_APOLLO_RESOLVE = {
-  id: '5e66b6381e05b4008c8331b8',
-  name: 'Acme Corp',
-  website_url: 'http://www.acme.com',
-  linkedin_url: 'http://www.linkedin.com/company/acme',
-  primary_domain: 'acme.com',
-  industry: 'information technology & services',
-  estimated_num_employees: 500,
-};
-
-const MOCK_APOLLO_PEOPLE = {
-  total_entries: 1,
-  people: [
+const MOCK_SEARXNG_COMPANY = {
+  results: [
     {
-      id: '63519a6d6fa6ba00019200f8',
-      first_name: 'Jane',
-      last_name: 'Doe',
-      title: 'CTO',
-      name: 'Jane Doe',
-      linkedin_url: 'https://linkedin.com/in/janedoe',
-      organization: { name: 'Acme Corp' },
+      title: 'Acme Corp | LinkedIn',
+      url: 'https://www.linkedin.com/company/acme',
+      content: 'Acme Corp is a technology company specializing in cloud solutions...',
     },
   ],
+};
+
+const MOCK_SEARXNG_LEADERS = {
+  results: [
+    {
+      title: 'Jane Doe - CTO - Acme Corp | LinkedIn',
+      url: 'https://www.linkedin.com/in/janedoe',
+      content: 'Chief Technology Officer at Acme Corp. Former VP Engineering at BigCo.',
+    },
+    {
+      title: 'John Smith - CISO - Acme Corp | LinkedIn',
+      url: 'https://www.linkedin.com/in/johnsmith',
+      content: 'Chief Information Security Officer at Acme Corp. Cybersecurity expert.',
+    },
+  ],
+};
+
+const MOCK_PARSED_LEADERS = {
+  people: [
+    {
+      name: 'Jane Doe',
+      title: 'CTO',
+      linkedin_url: 'https://www.linkedin.com/in/janedoe',
+      source: 'searxng',
+      snippet: 'Chief Technology Officer at Acme Corp. Former VP Engineering at BigCo.',
+    },
+    {
+      name: 'John Smith',
+      title: 'CISO',
+      linkedin_url: 'https://www.linkedin.com/in/johnsmith',
+      source: 'searxng',
+      snippet: 'Chief Information Security Officer at Acme Corp. Cybersecurity expert.',
+    },
+  ],
+  totalFound: 2,
 };
 
 const MOCK_SEC_EDGAR = {
@@ -397,8 +417,9 @@ function buildMockContext(workflowName) {
     },
     'Claude Analysis': MOCK_CLAUDE_RESPONSE,
     'Loop Over Companies': MOCK_COMPANY_ROW,
-    'Apollo Resolve Company': MOCK_APOLLO_RESOLVE,
-    'Apollo Search IT Leaders': MOCK_APOLLO_PEOPLE,
+    'SearXNG Company Search': MOCK_SEARXNG_COMPANY,
+    'SearXNG Search IT Leaders': MOCK_SEARXNG_LEADERS,
+    'Parse LinkedIn Results': MOCK_PARSED_LEADERS,
     'Format Results': {
       companyName: 'Acme Corp',
       leaderRows: [
