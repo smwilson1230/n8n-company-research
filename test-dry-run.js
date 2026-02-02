@@ -568,9 +568,10 @@ for (const [file, wf] of Object.entries(workflows)) {
     let bodyStr = jsonBodyRaw;
     if (bodyStr.startsWith('=')) bodyStr = bodyStr.slice(1);
 
-    // Replace n8n expressions with placeholder strings for JSON validation
-    // Expressions look like {{ ... }}
-    bodyStr = bodyStr.replace(/\{\{[^}]+\}\}/g, '"__EXPRESSION__"');
+    // Replace n8n expressions {{ ... }} with a plain placeholder for JSON
+    // validation.  All current expressions live inside JSON string values,
+    // so we must NOT add extra quotes around the placeholder.
+    bodyStr = bodyStr.replace(/\{\{[^}]+\}\}/g, '__EXPRESSION__');
 
     try {
       const bodyObj = JSON.parse(bodyStr);

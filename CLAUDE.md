@@ -30,6 +30,10 @@
    - `MASTER_SUMMARY_DOC_ID`
 5. Add these to your n8n instance environment variables
 
+## Testing
+- Run `node test-dry-run.js` before committing changes to workflow JSON files or the test script
+- All checks must pass (0 failures) before merging
+
 ## Conventions
 - Commit messages should be descriptive with a summary line and body
 - PRs should include a test plan
