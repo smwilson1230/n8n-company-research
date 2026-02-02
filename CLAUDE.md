@@ -30,6 +30,10 @@
    - `MASTER_SUMMARY_DOC_ID`
 5. Add these to your n8n instance environment variables
 
+## Setup: n8n Environment Variables
+1. Copy `.env.example` to `.env` and fill in your `ANTHROPIC_API_KEY`
+2. Pass the `.env` file to your n8n instance (e.g. `docker run --env-file .env ...` or source it before `npx n8n`)
+
 ## Testing
 - Run `node test-dry-run.js` before committing changes to workflow JSON files or the test script
 - All checks must pass (0 failures) before merging
