@@ -36,7 +36,7 @@
         "sheetName": {
           "__rl": true,
           "value": "Companies",
-          "mode": "list"
+          "mode": "name"
         }
       },
       "id": "read-companies",
@@ -234,7 +234,7 @@
         "sheetName": {
           "__rl": true,
           "value": "Leaders",
-          "mode": "list"
+          "mode": "name"
         },
         "filters": {
           "values": [
@@ -324,7 +324,7 @@
         "sheetName": {
           "__rl": true,
           "value": "Companies",
-          "mode": "list"
+          "mode": "name"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -434,7 +434,7 @@
         "sheetName": {
           "__rl": true,
           "value": "Leaders",
-          "mode": "list"
+          "mode": "name"
         },
         "columns": {
           "mappingMode": "defineBelow",
