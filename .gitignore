@@ -1,0 +1,10 @@
+# Environment and credentials
+.env
+credentials.json
+token.json
+
+# Node
+node_modules/
+
+# OS
+.DS_Store

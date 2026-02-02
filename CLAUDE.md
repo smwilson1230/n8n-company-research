@@ -20,6 +20,16 @@
 - Google Cloud (OAuth2 for Sheets/Docs/Drive APIs)
 - Anthropic Claude API (claude-sonnet-4-20250514)
 
+## Setup: Google Sheet & Drive Folder
+1. Go to https://script.google.com → **New Project**
+2. Paste the contents of `scripts/setup-google-sheet.gs` into the editor
+3. Run the `setup()` function and authorize when prompted
+4. Copy the three environment variable IDs from the alert dialog:
+   - `GOOGLE_SHEET_ID`
+   - `GOOGLE_DRIVE_FOLDER_ID`
+   - `MASTER_SUMMARY_DOC_ID`
+5. Add these to your n8n instance environment variables
+
 ## Conventions
 - Commit messages should be descriptive with a summary line and body
 - PRs should include a test plan
